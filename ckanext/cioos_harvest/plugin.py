@@ -74,49 +74,49 @@ def _get_extra(key, package_dict):
         if extra['key'] == key:
             return extra
 
-def _extract_xml_from_harvest_object(package_dict, harvest_object):
-    content = harvest_object.content
-    source_config = json.loads(harvest_object.source.config)
-    key = 'harvest_document_content'
-    value = ''
-    package_content = package_dict.get(key,'')
+# def _extract_xml_from_harvest_object(package_dict, harvest_object):
+#     content = harvest_object.content
+#     source_config = json.loads(harvest_object.source.config)
+#     key = 'harvest_document_content'
+#     value = ''
+#     package_content = package_dict.get(key,'')
 
-    if package_content.startswith('<'):
-        value = package_content
-    elif content.startswith('<'):
-        value = harvest_object.content
-    else:
-        log.warn('Unable to find harvest object "%s" '
-                 'referenced by dataset "%s". Trying xml url',
-                 harvest_object.id, package_dict['id'])
+#     if package_content.startswith('<'):
+#         value = package_content
+#     elif content.startswith('<'):
+#         value = harvest_object.content
+#     else:
+#         log.warn('Unable to find harvest object "%s" '
+#                  'referenced by dataset "%s". Trying xml url',
+#                  harvest_object.id, package_dict['id'])
 
-        # try reading from xml url
-        xml_url = load_json(package_dict.get('xml_location_url'))
-        if not xml_url:
-            log.warn('Empty or Missing URL in xml_location_url field. External xml metadata will not be retreaved.')
-        else:
-            urlopen_timeout = float(source_config.get('url_read_timeout') or toolkit.config.get('ckan.index_xml_url_read_timeout') or '500') / 1000.0  # get value in millieseconds but urllib assumes it is in seconds
+#         # try reading from xml url
+#         xml_url = load_json(package_dict.get('xml_location_url'))
+#         if not xml_url:
+#             log.warn('Empty or Missing URL in xml_location_url field. External xml metadata will not be retreaved.')
+#         else:
+#             urlopen_timeout = float(source_config.get('url_read_timeout') or toolkit.config.get('ckan.index_xml_url_read_timeout') or '500') / 1000.0  # get value in millieseconds but urllib assumes it is in seconds
 
-            # single file
-            if xml_url and isinstance(xml_url, string_types):
-                value = _get_xml_url_content(xml_url, urlopen_timeout, harvest_object)
+#             # single file
+#             if xml_url and isinstance(xml_url, string_types):
+#                 value = _get_xml_url_content(xml_url, urlopen_timeout, harvest_object)
 
-            # list of files
-            if xml_url and isinstance(xml_url, list):
-                for xml_file in xml_url:
-                    value = value + '<doc>' + _get_xml_url_content(xml_url, urlopen_timeout, harvest_object) + '</doc>'
+#             # list of files
+#             if xml_url and isinstance(xml_url, list):
+#                 for xml_file in xml_url:
+#                     value = value + '<doc>' + _get_xml_url_content(xml_url, urlopen_timeout, harvest_object) + '</doc>'
 
-                if value:
-                    value = '<?xml version="1.0" encoding="utf-8"?><docs>' + value + '</docs>'
+#                 if value:
+#                     value = '<?xml version="1.0" encoding="utf-8"?><docs>' + value + '</docs>'
 
-            value = re.sub('\s+',' ', value) # remove extra white space
-            value = re.sub('> <','><', value)
-            value = re.sub('> ','>', value)
-            value = re.sub(' <','<', value)
-    if value:
-        log.info('Success. External xml retrieved.')
-        package_dict[key] = value
-    return package_dict
+#             value = re.sub('\s+',' ', value) # remove extra white space
+#             value = re.sub('> <','><', value)
+#             value = re.sub('> ','>', value)
+#             value = re.sub(' <','<', value)
+#     if value:
+#         log.info('Success. External xml retrieved.')
+#         package_dict[key] = value
+#     return package_dict
 
 def handle_groups(context, harvest_object, group_mapping, group_type, cats = []):
         source_config = json.loads(harvest_object.source.config)
@@ -251,7 +251,11 @@ class CIOOSCKANHarvester(CKANHarvester):
         try:
             # convert extras key:value list to dictinary
             extras = {x['key']: x['value'] for x in package_dict.get('extras', [])}
-            package_dict = _extract_xml_from_harvest_object(package_dict, harvest_object)
+            log.debug('Harvesting "%s"',
+                      extras.get('title_translated') or 
+                      package_dict.get('title_translated') or
+                      package_dict.get('title'))
+            # package_dict = _extract_xml_from_harvest_object(package_dict, harvest_object)
 
             if not extras.get('metadata_created_source'):
                 extras['metadata_created_source'] = package_dict.get('metadata_created')
@@ -662,6 +666,11 @@ class Cioos_HarvestPlugin(plugins.SingletonPlugin):
         # convert extras key:value list to dictinary
         extras = {x['key']: x['value'] for x in package_dict.get('extras', [])}
 
+        log.debug('Harvesting "%s"',
+                extras.get('title_translated') or
+                package_dict.get('title_translated') or
+                package_dict.get('title'))
+
         extras['xml_location_url'] = xml_location_url
         if xml_modified_date:
             extras['xml_modified_date'] = xml_modified_date.replace('Z','')
@@ -693,7 +702,7 @@ class Cioos_HarvestPlugin(plugins.SingletonPlugin):
         
 
         # load remote xml content
-        package_dict = _extract_xml_from_harvest_object(package_dict, harvest_object)
+        # package_dict = _extract_xml_from_harvest_object(package_dict, harvest_object)
 
         # Handle Scheming, Composit, and Fluent extensions
         loaded_plugins = plugins.toolkit.config.get("ckan.plugins")
